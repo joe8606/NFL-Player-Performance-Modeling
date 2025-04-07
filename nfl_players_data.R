@@ -10,7 +10,7 @@ roster_data <- fast_scraper_roster(years)
 # extract QB basic data
 QB <- roster_data %>%
   filter(position == 'QB') %>%group_by(season, gsis_id)%>%
-  select(season,gsis_id, full_name, position, birth_date, height, weight, years_exp, rookie_year,entry_year, draft_number,depth_chart_position)
+  select(season,gsis_id, full_name, team, position, birth_date, height, weight, years_exp, rookie_year,entry_year, draft_number,depth_chart_position)
 # years_exp- experiences
 # rookie_year:when the player plays in their first NFL game 
 # entry_year:when the player is officially part of the league(drafted/signed)
@@ -38,13 +38,27 @@ qb_play_stats <- pbp_data %>%
     comp_pct = pass_attempts/completions * 100,
     air_yards = sum(ifelse(complete_pass == 1, air_yards, 0), na.rm = TRUE),
     passing_yards = sum(ifelse(play_type == 'pass', yards_gained,0), na.rm = TRUE),
+    first_down_pass = sum(first_down_pass,na.rm = TRUE),
     pass_touchdowns = sum(pass_touchdown, na.rm = TRUE),
     interceptions = sum(interception, na.rm = TRUE),
     rush_attempts = sum(rush_attempt, na.rm = TRUE),
     rushing_yards = sum(rushing_yards, na.rm = TRUE),
     rush_touchdowns = sum(rush_touchdown, na.rm = TRUE),
+    first_down_rush = sum(first_down_rush, na.rm = TRUE),
+    third_down_converted =sum(third_down_converted, na.rm = TRUE),
+    third_down_failed =sum(third_down_converted, na.rm = TRUE),
+    third_down_rate = third_down_converted/sum(third_down_converted,third_down_failed),
+    fourth_down_converted =sum(third_down_converted, na.rm = TRUE),
+    fourth_down_failed =sum(third_down_converted, na.rm = TRUE),
+    fourth_down_rate = third_down_converted/sum(third_down_converted,third_down_failed),
     fumble = sum(fumble, na.rm = TRUE),
+    fumble_forced = sum(fumble_forced, na.rm = TRUE),
+    fumble_not_forced = sum(fumble_not_forced, na.rm = TRUE),
+    tackled_for_loss = sum(tackled_for_loss, na.rm = TRUE),
+    fumble_lost =sum(fumble_lost, na.rm = TRUE),
     sack = sum(sack, na.rm = TRUE),
+    penalties = sum(penalty_player_id %in% QB_id, na.rm = TRUE),
+    penalty_yards = sum(ifelse(penalty_player_id %in% QB_id, penalty_yards, 0), na.rm = TRUE),
     qb_dropback = sum(qb_dropback, na.rm = TRUE),
     # epa - expected points added (or lost) by plays
     total_epa = sum(epa, na.rm = TRUE), 
@@ -59,14 +73,14 @@ qb_play_stats <- pbp_data %>%
 qb_stats <- merge(QB, qb_play_stats, by.x = c("season", "gsis_id"), by.y = c("season", "player_id"),  all = FALSE) %>% relocate(week, .after = season)
 
 
-write.csv(qb_stats,'C:/Users/Katrina/Desktop/CYang Rutgers/data/qb_stats.csv',row.names = FALSE)
+
 
 
 # Get RB basic data
 RB <- roster_data %>%
   filter(position == 'RB') %>%
   group_by(season, gsis_id)%>%
-  select(season,gsis_id, full_name, position, birth_date, height, weight, years_exp, rookie_year,entry_year, draft_number,depth_chart_position)
+  select(season,gsis_id, full_name, team, position, birth_date, height, weight, years_exp, rookie_year,entry_year, draft_number,depth_chart_position)
 
 # get RB gsis_id
 RB_id <-RB %>%
@@ -88,10 +102,25 @@ rb_play_stats <- pbp_data %>%
     rushing_yards = sum(ifelse(play_type == 'run', yards_gained,0), na.rm = TRUE),
     rush_ypa = rushing_yards/rush_attempts * 100 , # Rushing Yards per Attempt 
     rush_tds = sum(rush_touchdown, na.rm = TRUE),
-    receptions = sum(complete_pass, na.rm = TRUE),
-    yac = sum(yards_after_catch, na.rm = TRUE), # yards after catch
-    fumble = sum(fumble, na.rm = TRUE),
+    first_down_rush = sum(first_down_rush, na.rm = TRUE),
     targets = sum(pass_attempt, na.rm = TRUE),
+    receptions = sum(complete_pass, na.rm = TRUE),
+    yac = sum(yards_after_catch, na.rm = TRUE),
+    # yards after catch
+    first_down_pass = sum(first_down_pass,na.rm = TRUE),
+    third_down_converted =sum(third_down_converted, na.rm = TRUE),
+    third_down_failed =sum(third_down_converted, na.rm = TRUE),
+    third_down_rate = third_down_converted/sum(third_down_converted,third_down_failed),
+    fourth_down_converted =sum(fourth_down_converted, na.rm = TRUE),
+    fourth_down_failed =sum(fourth_down_converted, na.rm = TRUE),
+    fourth_down_rate = fourth_down_converted/sum(fourth_down_converted,fourth_down_failed),
+    fumble = sum(fumble, na.rm = TRUE),
+    fumble_forced = sum(fumble_forced, na.rm = TRUE),
+    fumble_not_forced = sum(fumble_not_forced, na.rm = TRUE),
+    fumble_lost =sum(fumble_lost, na.rm = TRUE),
+    tackled_for_loss = sum(tackled_for_loss, na.rm = TRUE),
+    penalties = sum(penalty_player_id %in% RB_id, na.rm = TRUE),
+    penalty_yards = sum(ifelse(penalty_player_id %in% RB_id, penalty_yards, 0), na.rm = TRUE),
     total_epa = sum(epa, na.rm = TRUE),
     avg_epa = mean(epa, na.rm = TRUE),
     .groups = 'keep'
@@ -101,14 +130,14 @@ rb_play_stats <- pbp_data %>%
 # merge RB basic data and play data
 rb_stats <- merge(RB, rb_play_stats, by.x = c("season", "gsis_id"), by.y = c("season", "player_id"),  all = FALSE)%>%relocate(week, .after = season)
 
-write.csv(rb_stats,'C:/Users/Katrina/Desktop/CYang Rutgers/data/rb_stats.csv',row.names = FALSE)
+
 
 # wr/te data
 # Get wr/te basic data
 wrte <- roster_data %>%
   filter(position == 'TE'|position == 'WR') %>%
   group_by(season, gsis_id)%>%
-  select(season,gsis_id, full_name, position, birth_date, height, weight, years_exp, rookie_year,entry_year, draft_number,depth_chart_position)
+  select(season,gsis_id, full_name, team, position, birth_date, height, weight, years_exp, rookie_year,entry_year, draft_number,depth_chart_position)
 
 # get wr/te gsis_id
 wrte_id <- wrte %>%
@@ -131,10 +160,24 @@ wrte_play_stats <- pbp_data %>%
     air_yards = sum(ifelse(complete_pass == 1, air_yards, 0), na.rm = TRUE),
     yac = sum(yards_after_catch, na.rm = TRUE),
     pass_tds = sum(pass_touchdown, na.rm = TRUE),
+    first_down_pass = sum(first_down_pass,na.rm = TRUE),
     rush_attempts = sum(rush_attempt, na.rm = TRUE),
     rushing_yards = sum(ifelse(play_type == 'run', yards_gained,0), na.rm = TRUE),
     rush_tds = sum(rush_touchdown, na.rm = TRUE),
+    first_down_rush = sum(first_down_rush, na.rm = TRUE),
+    third_down_converted =sum(third_down_converted, na.rm = TRUE),
+    third_down_failed =sum(third_down_converted, na.rm = TRUE),
+    third_down_rate = third_down_converted/sum(third_down_converted,third_down_failed),
+    fourth_down_converted =sum(fourth_down_converted, na.rm = TRUE),
+    fourth_down_failed =sum(fourth_down_converted, na.rm = TRUE),
+    fourth_down_rate = fourth_down_converted/sum(fourth_down_converted,fourth_down_failed),
     fumble = sum(fumble, na.rm = TRUE),
+    fumble_forced = sum(fumble_forced, na.rm = TRUE),
+    fumble_not_forced = sum(fumble_not_forced, na.rm = TRUE),
+    fumble_lost =sum(fumble_lost, na.rm = TRUE),
+    tackled_for_loss = sum(tackled_for_loss, na.rm = TRUE),
+    penalties = sum(penalty_player_id %in% wrte_id, na.rm = TRUE),
+    penalty_yards = sum(ifelse(penalty_player_id %in% wrte_id, penalty_yards, 0), na.rm = TRUE),
     total_epa = sum(epa, na.rm = TRUE),
     avg_epa = mean(epa, na.rm = TRUE),
     .groups = 'keep'
@@ -143,3 +186,4 @@ wrte_play_stats <- pbp_data %>%
 
 # merge wrte basic data and play data
 wrte_stats <- merge(wrte, wrte_play_stats, by.x = c("season", "gsis_id"), by.y = c("season", "player_id"),  all = FALSE)%>%relocate(week, .after = season)
+
