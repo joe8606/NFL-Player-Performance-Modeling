@@ -7,7 +7,6 @@ library(dplyr)
 years <- 2018:2023
 pbp_data <- load_pbp(years)
 roster_data <- fast_scraper_roster(years)
-# extract QB basic data
 QB <- roster_data %>%
   filter(position == 'QB') %>%group_by(season, gsis_id)%>%
   select(season,gsis_id, full_name, team, position, birth_date, height, weight, years_exp, rookie_year,entry_year, draft_number,depth_chart_position)
@@ -35,7 +34,7 @@ qb_play_stats <- pbp_data %>%
   summarize(
     pass_attempts = sum(pass_attempt, na.rm = TRUE),
     completions = sum(complete_pass, na.rm = TRUE),
-    comp_pct = pass_attempts/completions * 100,
+    comp_pct = completions/pass_attempts * 100,
     air_yards = sum(ifelse(complete_pass == 1, air_yards, 0), na.rm = TRUE),
     passing_yards = sum(ifelse(play_type == 'pass', yards_gained,0), na.rm = TRUE),
     first_down_pass = sum(first_down_pass,na.rm = TRUE),
@@ -46,18 +45,18 @@ qb_play_stats <- pbp_data %>%
     rush_touchdowns = sum(rush_touchdown, na.rm = TRUE),
     first_down_rush = sum(first_down_rush, na.rm = TRUE),
     third_down_converted =sum(third_down_converted, na.rm = TRUE),
-    third_down_failed =sum(third_down_converted, na.rm = TRUE),
+    third_down_failed =sum(third_down_failed, na.rm = TRUE),
     third_down_rate = third_down_converted/sum(third_down_converted,third_down_failed),
-    fourth_down_converted =sum(third_down_converted, na.rm = TRUE),
-    fourth_down_failed =sum(third_down_converted, na.rm = TRUE),
-    fourth_down_rate = third_down_converted/sum(third_down_converted,third_down_failed),
+    fourth_down_converted =sum(fourth_down_converted, na.rm = TRUE),
+    fourth_down_failed =sum(fourth_down_failed, na.rm = TRUE),
+    fourth_down_rate = fourth_down_converted/sum(fourth_down_converted,fourth_down_failed),
     fumble = sum(fumble, na.rm = TRUE),
     fumble_forced = sum(fumble_forced, na.rm = TRUE),
     fumble_not_forced = sum(fumble_not_forced, na.rm = TRUE),
     tackled_for_loss = sum(tackled_for_loss, na.rm = TRUE),
     fumble_lost =sum(fumble_lost, na.rm = TRUE),
     sack = sum(sack, na.rm = TRUE),
-    penalties = sum(penalty_player_id %in% QB_id, na.rm = TRUE),
+    penalties = sum(ifelse(penalty_player_id %in% QB_id, penalty, 0), na.rm = TRUE),
     penalty_yards = sum(ifelse(penalty_player_id %in% QB_id, penalty_yards, 0), na.rm = TRUE),
     qb_dropback = sum(qb_dropback, na.rm = TRUE),
     # epa - expected points added (or lost) by plays
@@ -73,7 +72,7 @@ qb_play_stats <- pbp_data %>%
 qb_stats <- merge(QB, qb_play_stats, by.x = c("season", "gsis_id"), by.y = c("season", "player_id"),  all = FALSE) %>% relocate(week, .after = season)
 
 
-
+write.csv(qb_stats,'C:/Users/Katrina/Desktop/CYang Rutgers/data/qb_stats.csv',row.names = FALSE)
 
 
 # Get RB basic data
@@ -109,17 +108,17 @@ rb_play_stats <- pbp_data %>%
     # yards after catch
     first_down_pass = sum(first_down_pass,na.rm = TRUE),
     third_down_converted =sum(third_down_converted, na.rm = TRUE),
-    third_down_failed =sum(third_down_converted, na.rm = TRUE),
+    third_down_failed =sum(third_down_failed, na.rm = TRUE),
     third_down_rate = third_down_converted/sum(third_down_converted,third_down_failed),
     fourth_down_converted =sum(fourth_down_converted, na.rm = TRUE),
-    fourth_down_failed =sum(fourth_down_converted, na.rm = TRUE),
+    fourth_down_failed =sum(fourth_down_failed, na.rm = TRUE),
     fourth_down_rate = fourth_down_converted/sum(fourth_down_converted,fourth_down_failed),
     fumble = sum(fumble, na.rm = TRUE),
     fumble_forced = sum(fumble_forced, na.rm = TRUE),
     fumble_not_forced = sum(fumble_not_forced, na.rm = TRUE),
     fumble_lost =sum(fumble_lost, na.rm = TRUE),
     tackled_for_loss = sum(tackled_for_loss, na.rm = TRUE),
-    penalties = sum(penalty_player_id %in% RB_id, na.rm = TRUE),
+    penalties = sum(ifelse(penalty_player_id %in% RB_id, penalty, 0), na.rm = TRUE),
     penalty_yards = sum(ifelse(penalty_player_id %in% RB_id, penalty_yards, 0), na.rm = TRUE),
     total_epa = sum(epa, na.rm = TRUE),
     avg_epa = mean(epa, na.rm = TRUE),
@@ -130,7 +129,7 @@ rb_play_stats <- pbp_data %>%
 # merge RB basic data and play data
 rb_stats <- merge(RB, rb_play_stats, by.x = c("season", "gsis_id"), by.y = c("season", "player_id"),  all = FALSE)%>%relocate(week, .after = season)
 
-
+write.csv(rb_stats,'C:/Users/Katrina/Desktop/CYang Rutgers/data/rb_stats.csv',row.names = FALSE)
 
 # wr/te data
 # Get wr/te basic data
@@ -166,17 +165,17 @@ wrte_play_stats <- pbp_data %>%
     rush_tds = sum(rush_touchdown, na.rm = TRUE),
     first_down_rush = sum(first_down_rush, na.rm = TRUE),
     third_down_converted =sum(third_down_converted, na.rm = TRUE),
-    third_down_failed =sum(third_down_converted, na.rm = TRUE),
+    third_down_failed =sum(third_down_failed, na.rm = TRUE),
     third_down_rate = third_down_converted/sum(third_down_converted,third_down_failed),
     fourth_down_converted =sum(fourth_down_converted, na.rm = TRUE),
-    fourth_down_failed =sum(fourth_down_converted, na.rm = TRUE),
+    fourth_down_failed =sum(fourth_down_failed, na.rm = TRUE),
     fourth_down_rate = fourth_down_converted/sum(fourth_down_converted,fourth_down_failed),
     fumble = sum(fumble, na.rm = TRUE),
     fumble_forced = sum(fumble_forced, na.rm = TRUE),
     fumble_not_forced = sum(fumble_not_forced, na.rm = TRUE),
     fumble_lost =sum(fumble_lost, na.rm = TRUE),
     tackled_for_loss = sum(tackled_for_loss, na.rm = TRUE),
-    penalties = sum(penalty_player_id %in% wrte_id, na.rm = TRUE),
+    penalties = sum(ifelse(penalty_player_id %in% wrte_id, penalty, 0), na.rm = TRUE),
     penalty_yards = sum(ifelse(penalty_player_id %in% wrte_id, penalty_yards, 0), na.rm = TRUE),
     total_epa = sum(epa, na.rm = TRUE),
     avg_epa = mean(epa, na.rm = TRUE),
@@ -186,4 +185,8 @@ wrte_play_stats <- pbp_data %>%
 
 # merge wrte basic data and play data
 wrte_stats <- merge(wrte, wrte_play_stats, by.x = c("season", "gsis_id"), by.y = c("season", "player_id"),  all = FALSE)%>%relocate(week, .after = season)
+write.csv(wrte_stats,'C:/Users/Katrina/Desktop/CYang Rutgers/data/wrte_stats.csv',row.names = FALSE)
+
+
+
 
