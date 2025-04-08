@@ -3,10 +3,20 @@ library(ggrepel)
 library(nflreadr)
 library(nflfastR)
 library(dplyr)
-# load data from season 2018 to season 2023, considering the player's career length and stability of player performance over time.
 years <- 2018:2023
+# codes that obtain play by play data, keep for record
 pbp_data <- load_pbp(years)
+# write.csv(pbp_data, "C:/Users/Katrina/Desktop/CYang Rutgers/data/pbp_data.csv", row.names = FALSE)
+
+
+
+# Get the roster data- NFL players's data
 roster_data <- fast_scraper_roster(years)
+# write.csv(roster_data, "roster.csv", row.names = FALSE)
+
+
+  
+# extract QB basic data
 QB <- roster_data %>%
   filter(position == 'QB') %>%group_by(season, gsis_id)%>%
   select(season,gsis_id, full_name, team, position, birth_date, height, weight, years_exp, rookie_year,entry_year, draft_number,depth_chart_position)
@@ -20,6 +30,13 @@ QB_id <- QB %>%
   ungroup() %>%
   pull(gsis_id)
   
+nextgen_passing <- load_nextgen_stats(
+  seasons = TRUE,
+  stat_type = 'passing',
+  file_type = getOption("nflreadr.rds", default = "rds")
+)
+nextgen_passing <- nextgen_passing%>%
+  select("season", "week", "avg_time_to_throw", "avg_completed_air_yards", "avg_intended_air_yards", "avg_air_yards_differential", "aggressiveness", "max_completed_air_distance", "avg_air_yards_to_sticks", "pass_yards", "pass_touchdowns", "interceptions", "completions", "completion_percentage", "expected_completion_percentage", "completion_percentage_above_expectation", "avg_air_distance", "max_air_distance", "player_gsis_id" )
 
 qb_play_stats <- pbp_data %>%
   # Create a new column: player_id.Apply passer/rusher player IDs that are in QB_id to player_id
@@ -33,13 +50,8 @@ qb_play_stats <- pbp_data %>%
   group_by(season, week, player_id) %>%
   summarize(
     pass_attempts = sum(pass_attempt, na.rm = TRUE),
-    completions = sum(complete_pass, na.rm = TRUE),
-    comp_pct = completions/pass_attempts * 100,
     air_yards = sum(ifelse(complete_pass == 1, air_yards, 0), na.rm = TRUE),
-    passing_yards = sum(ifelse(play_type == 'pass', yards_gained,0), na.rm = TRUE),
     first_down_pass = sum(first_down_pass,na.rm = TRUE),
-    pass_touchdowns = sum(pass_touchdown, na.rm = TRUE),
-    interceptions = sum(interception, na.rm = TRUE),
     rush_attempts = sum(rush_attempt, na.rm = TRUE),
     rushing_yards = sum(rushing_yards, na.rm = TRUE),
     rush_touchdowns = sum(rush_touchdown, na.rm = TRUE),
@@ -71,8 +83,8 @@ qb_play_stats <- pbp_data %>%
 # merge QB basic data and play data, keep all the rows in qb_play_stats
 qb_stats <- merge(QB, qb_play_stats, by.x = c("season", "gsis_id"), by.y = c("season", "player_id"),  all = FALSE) %>% relocate(week, .after = season)
 
+qb_stats <- merge(qb_stats, nextgen_passing, by.x = c("season","week", "gsis_id"), by.y = c("season","week", "player_gsis_id"),  all.x = TRUE)
 
-write.csv(qb_stats,'C:/Users/Katrina/Desktop/CYang Rutgers/data/qb_stats.csv',row.names = FALSE)
 
 
 # Get RB basic data
@@ -86,6 +98,16 @@ RB_id <-RB %>%
   ungroup() %>%
   pull(gsis_id)
 
+nextgen_rushing<- load_nextgen_stats(
+  seasons = TRUE,
+  stat_type = 'rushing',
+  file_type = getOption("nflreadr.rds", default = "rds")
+)
+
+nextgen_rushing <- nextgen_rushing%>%
+  select('season','week',"efficiency","percent_attempts_gte_eight_defenders","avg_time_to_los","rush_attempts","rush_yards", "avg_rush_yards", "rush_touchdowns", "player_gsis_id" ,"expected_rush_yards","rush_yards_over_expected","rush_yards_over_expected_per_att","rush_pct_over_expected" )
+
+
 # Get RB 
 rb_play_stats <- pbp_data %>%
   mutate(
@@ -97,10 +119,6 @@ rb_play_stats <- pbp_data %>%
   filter(!is.na(player_id) )%>%
   group_by(season, week, player_id) %>%
   summarize(
-    rush_attempts = sum(rush_attempt,na.rm = TRUE),
-    rushing_yards = sum(ifelse(play_type == 'run', yards_gained,0), na.rm = TRUE),
-    rush_ypa = rushing_yards/rush_attempts * 100 , # Rushing Yards per Attempt 
-    rush_tds = sum(rush_touchdown, na.rm = TRUE),
     first_down_rush = sum(first_down_rush, na.rm = TRUE),
     targets = sum(pass_attempt, na.rm = TRUE),
     receptions = sum(complete_pass, na.rm = TRUE),
@@ -128,8 +146,8 @@ rb_play_stats <- pbp_data %>%
 
 # merge RB basic data and play data
 rb_stats <- merge(RB, rb_play_stats, by.x = c("season", "gsis_id"), by.y = c("season", "player_id"),  all = FALSE)%>%relocate(week, .after = season)
+rb_stats <- merge(rb_stats, nextgen_rushing, by.x = c("season","week", "gsis_id"), by.y = c("season","week", "player_gsis_id"),  all.x = TRUE)
 
-write.csv(rb_stats,'C:/Users/Katrina/Desktop/CYang Rutgers/data/rb_stats.csv',row.names = FALSE)
 
 # wr/te data
 # Get wr/te basic data
@@ -143,6 +161,15 @@ wrte_id <- wrte %>%
   ungroup()%>%
   pull(gsis_id)
 
+nextgen_receiving<- load_nextgen_stats(
+  seasons = TRUE,
+  stat_type = 'receiving',
+  file_type = getOption("nflreadr.rds", default = "rds")
+)
+
+nextgen_receiving <- nextgen_receiving%>%
+  select('season','week',"avg_cushion","avg_separation","avg_intended_air_yards","percent_share_of_intended_air_yards","receptions","targets", "catch_percentage","rec_touchdowns" ,"avg_yac", "avg_expected_yac", "avg_yac_above_expectation","player_gsis_id" )
+
 wrte_play_stats <- pbp_data %>%
   mutate(
     receiver_wrte = if_else(receiver_player_id %in% wrte_id, receiver_player_id, NA_character_),
@@ -153,13 +180,9 @@ wrte_play_stats <- pbp_data %>%
   filter(!is.na(player_id))%>%
   group_by(season, week, player_id)%>%
   summarize(
-    targets = sum(pass_attempt, na.rm = TRUE),  
-    receptions = sum(complete_pass, na.rm = TRUE),
-    catch_rate = receptions/targets* 100,
     air_yards = sum(ifelse(complete_pass == 1, air_yards, 0), na.rm = TRUE),
     yac = sum(yards_after_catch, na.rm = TRUE),
-    pass_tds = sum(pass_touchdown, na.rm = TRUE),
-    first_down_pass = sum(first_down_pass,na.rm = TRUE),
+    first_down_receive = sum(first_down_pass,na.rm = TRUE),
     rush_attempts = sum(rush_attempt, na.rm = TRUE),
     rushing_yards = sum(ifelse(play_type == 'run', yards_gained,0), na.rm = TRUE),
     rush_tds = sum(rush_touchdown, na.rm = TRUE),
@@ -185,7 +208,8 @@ wrte_play_stats <- pbp_data %>%
 
 # merge wrte basic data and play data
 wrte_stats <- merge(wrte, wrte_play_stats, by.x = c("season", "gsis_id"), by.y = c("season", "player_id"),  all = FALSE)%>%relocate(week, .after = season)
-write.csv(wrte_stats,'C:/Users/Katrina/Desktop/CYang Rutgers/data/wrte_stats.csv',row.names = FALSE)
+
+wrte_stats <- merge(wrte_stats, nextgen_receiving, by.x = c("season","week", "gsis_id"), by.y = c("season","week", "player_gsis_id"),  all.x = TRUE)
 
 
 
