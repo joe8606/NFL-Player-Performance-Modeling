@@ -1,0 +1,158 @@
+---
+title: "qb_model_fit"
+output: html_document
+date: "2025-04-10"
+---
+
+```{r}
+library(ISLR)
+library(leaps)
+library(tidyverse)
+library(lubridate) # Calculate age
+library(dplyr)
+QB <- read.csv('C:/Users/Katrina/Desktop/CYang Rutgers/data/qb_stats.csv')
+QB <- QB[!is.na(QB$avg_epa), ]
+QB[is.na(QB)] <- 0
+# Roughly calculate players' age
+QB$birth_date<- as.Date(QB$birth_date)  # Make sure it's in Date format
+QB$game_date <- as.Date(paste0(QB$season, "-09-01")) + (QB$week - 1) * 7
+QB$age <- as.numeric(difftime(QB$game_date, QB$birth_date, units = "days")) / 365.25
+# Arrange and rank games within each player
+QB <- QB %>%
+  arrange(gsis_id, game_date) %>%
+  group_by(gsis_id) %>%
+  mutate(game_number = row_number(),
+         total_games = n(),
+         split_group = ifelse(game_number <= 0.8 * total_games, "train", "test")) %>%
+  ungroup()
+
+# Exclude some variables calculated by other,non-predictive and variables related to avg_epa
+QB <- QB[,!(colnames(QB) %in% c("gsis_id","full_name", "position","birth_date", "depth_chart_position","total_epa" ,"cpoe", "season_date","third_down_rate","fourth_down_rate","fumble","air_yards","completion_percentage","avg_air_yards_differential","game_number","total_games"))]
+
+# Pending remove or not
+QB <- QB[,!(colnames(QB) %in% c("rookie_year","entry_year"))]
+
+# Convert season and week to dummy variable
+QB$season <- as.factor(QB$season)
+QB$week <- as.factor(QB$week)
+QB$team <- as.factor(QB$team)
+QB <- QB %>% relocate('avg_epa')
+```
+
+## Best subset selection
+```{r}
+# Exclude season,team due to limited computing power
+QB_sub <- QB[,!(colnames(QB) %in% c('season', 'team', 'week'))]
+
+
+train <- QB_sub %>% filter(split_group == "train")
+test  <- QB_sub %>% filter(split_group == "test")
+p <- ncol(train)
+train <- train[,-p]
+test <- test[,-p]
+p <- ncol(train)-1
+fit.full <- regsubsets(avg_epa ~ .,data = train,nvmax = p ,really.big = TRUE)
+full.sum <- summary(fit.full)
+
+# adj Rsq, Cp,BIC
+full.sum$adjr2
+adjr2 <- which.max(full.sum$adjr2)
+full.sum$cp
+cp <- which.min(full.sum$cp)
+full.sum$bic
+bic <- which.min(full.sum$bic)
+# 10-fold cross validation
+set.seed(3)
+k <- 10
+folds <- sample(1:k,nrow(train),replace = T)
+
+cv.errors <- matrix(0,k,p)
+x.train <- model.matrix(avg_epa~.,data = train)
+y.train <- train$avg_epa
+for (i in 1:k){
+  best.fit <- regsubsets(avg_epa~., data = train[folds != i,], nvmax = p)
+  for (j in 1:p){
+    coefi <- coef(best.fit, id = j)
+    pred <- x.train[folds == i,names(coefi)]%*%coefi
+    cv.errors[i,j] <- mean((y.train[folds==i]-pred)^2)
+  }
+}
+cv.mse <- apply(cv.errors,2,mean)
+cv <- which.min(cv.mse)
+x.test <- model.matrix(avg_epa~., data = test)
+y.test <- test$avg_epa
+# Test MSE
+test.mse <- rep(0,p)
+for (i in 1:p){
+  coefi <- coef(fit.full, id = i)
+  pred <- x.test[,names(coefi)]%*%coefi
+  test.mse[i] <- mean((y.test-pred)^2)
+}
+test.mse
+test.min <- which.min(test.mse)
+m <- min(c(adjr2,cp,bic,cv,test.min))
+par(mar = c(4.1,1,4.1,1),mfrow = c(1,5))
+plot(full.sum$adjr2, xlab = '# of variables', ylab='adj Rsq',type = 'l',main = paste('adj Rsq',adjr2))
+points(adjr2,full.sum$adjr2[adjr2],cex =1.5, pch = 18, col ='red')
+abline(v = m, col = "blue", lty = 2)
+plot(full.sum$cp, xlab = '# of variables', ylab='Cp',type = 'l',,main =paste('Cp',cp))
+points(cp,full.sum$cp[cp],cex =1.5, pch = 18, col ='red')
+abline(v = m, col = "blue", lty = 2)
+plot(full.sum$bic, xlab = '# of variables', ylab='BIC',type = 'l',,main =paste('BIC',bic))
+points(bic,full.sum$bic[bic],cex =1.5, pch = 18, col ='red')
+abline(v = m, col = "blue", lty = 2)
+plot(1:length(cv.mse),cv.mse, xlab = '# of variables', ylab='CV',type = 'l',,main =paste('CV MSE',cv))
+points(cv,cv.mse[cv],cex =1.5, pch = 18, col ='red')
+abline(v = m, col = "blue", lty = 2)
+plot(1:length(test.mse),test.mse,xlab = '# of variables', ylab='test MSE',type = 'l',,main =paste('test MSE',test.min))
+points(test.min,test.mse[test.min],cex =1.5, pch = 18, col ='red')
+abline(v = m, col = "blue", lty = 2)
+```
+
+```{r}
+coefi <- coef(fit.full, id = m)
+coefi
+```
+
+## Ridge and lasso
+```{r}
+# Fit ridge, ridge can works well with multicollinearity, keep all the variables
+train <- QB %>% filter(split_group == "train")
+test  <- QB %>% filter(split_group == "test")
+p <- ncol(train)
+train <- train[,-p]
+test <- test[,-p]
+train_matrix <- model.matrix(avg_epa ~., data = train)
+test_matrix <- model.matrix(avg_epa ~., data = test)
+library(glmnet)
+set.seed(4)
+cv.out <- cv.glmnet(train_matrix, train$avg_epa, alpha =0)
+ridge.bestlam <- cv.out$lambda.min
+ridge.mod <- glmnet(train_matrix, train$avg_epa,alpha = 0, lambda = ridge.bestlam)
+ridge.mod
+coef(ridge.mod)
+```
+```{r}
+ridge.pred <- predict(ridge.mod, s = ridge.bestlam, newx = test_matrix)
+ridge.mse <- mean((ridge.pred - test$avg_epa)^2)
+ridge.mse
+```
+
+
+## Lasso regression
+```{r}
+# Fit lasso, multicollinearity may cause unstable
+# Choose lambda
+cv.out <- cv.glmnet(train_matrix, train$avg_epa, alpha =1)
+lasso.bestlam <- cv.out$lambda.min
+lasso.bestlam
+# fit ridge regression
+lasso.mod <- glmnet(train_matrix, train$avg_epa,alpha = 1,lambda = lasso.bestlam)
+lasso.mod
+coef(lasso.mod)
+```
+```{r}
+lasso.pred <- predict(lasso.mod, s = lasso.bestlam, newx = test_matrix)
+lasso.mse <- mean((lasso.pred - test$avg_epa)^2)
+lasso.mse
+```
