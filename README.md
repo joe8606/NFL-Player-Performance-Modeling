@@ -15,6 +15,7 @@ nfl_players_data.R - Retrieval of NFL player positions data QB, RB, WR/TE from N
   
   wrte_stats.csv - Wide Receiver/Tight End stats
 
+qb_model_fit.Rmd - EPA prediciton using linear regression models and GAM, only tabular data
 
 nfl_scraper_functions.py - Web scraping functions for retrieving player statistics from NFL.com
 
